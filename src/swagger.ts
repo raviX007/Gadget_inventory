@@ -230,7 +230,7 @@ const swaggerOptions = {
                     type: 'string',
                     enum: ['All', 'Active', 'Decommissioned', 'Destroyed']
                 },
-                description: 'Filter gadgets by status. Use "All" to get gadgets in all statuses.'
+                description: 'Filter gadgets by status. Use "All" to get gadgets in all statuses. Leaving filter blank will fetch only active and destroyed gadgets. '
             }
         ],
         responses: {
