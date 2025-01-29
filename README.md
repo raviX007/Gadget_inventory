@@ -49,7 +49,7 @@ DB_DATABASE=imf_gadgets
 4. Start the development server:
 
 ```bash
-npm run dev
+npm start
 ```
 
 ## API Documentation
