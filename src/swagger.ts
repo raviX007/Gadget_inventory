@@ -12,7 +12,7 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://localhost:3000',
+                url: 'https://gadget-inventory-4qyd.onrender.com',
                 description: 'Development server',
             },
         ],
