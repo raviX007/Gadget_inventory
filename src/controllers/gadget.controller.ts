@@ -3,31 +3,20 @@ import { AppDataSource } from '../config/database';
 import { Gadget } from '../models/Gadget';
 import { generateCodename } from '../utils/codename-generator';
 import { CreateGadgetDto, UpdateGadgetDto } from '../types/gadget.types';
+import crypto from "crypto";
 
 const gadgetRepository = AppDataSource.getRepository(Gadget);
 
-export const getAllGadgets = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const gadgets = await gadgetRepository.find();
-        const gadgetsWithProbability = gadgets.map(gadget => ({
-            ...gadget,
-            missionSuccessProbability: Math.floor(Math.random() * 41) + 60 // 60-100%
-        }));
-        res.json(gadgetsWithProbability);
-    } catch (error) {
-        res.status(500).json({ message: "Failed to retrieve gadgets" });
-    }
-};
+
 
 export const getGadgets = async (req: Request, res: Response): Promise<void> => {
   try {
       const { status } = req.query;
 
-      // Build query with optional status filter
+     
       const queryBuilder = gadgetRepository.createQueryBuilder('gadget');
 
       if (status) {
-          // Validate status value
           const validStatuses = ['Active', 'Decommissioned', 'Destroyed'];
           if (!validStatuses.includes(status as string)) {
               res.status(400).json({ 
@@ -39,7 +28,6 @@ export const getGadgets = async (req: Request, res: Response): Promise<void> => 
           queryBuilder.where('gadget.status = :status', { status });
       }
 
-      // Add ordering by creation date (newest first)
       queryBuilder.orderBy('gadget.createdAt', 'DESC');
 
       const gadgets = await queryBuilder.getMany();
@@ -62,7 +50,6 @@ export const createGadget = async (
         gadget.description = description;
         gadget.codename = generateCodename();
 
-        // Ensure unique codename
         let isUnique = false;
         while (!isUnique) {
             const existing = await gadgetRepository.findOne({ 
@@ -96,7 +83,6 @@ export const updateGadget = async (
             return;
         }
 
-        // Only update allowed fields
         if (updates.name) gadget.name = updates.name;
         if (updates.description) gadget.description = updates.description;
         if (updates.status) gadget.status = updates.status;
@@ -132,124 +118,164 @@ export const deleteGadget = async (
     }
 };
 
+
 interface SelfDestructRequestBody {
-  confirmationCode: string;
+    confirmationCode: string;
 }
 
-// Store generated confirmation codes with expiration
-const pendingSelfDestructs = new Map<string, {
-  code: string;
-  expiresAt: Date;
-  attempts: number;
-}>();
+interface PendingSelfDestruct {
+    code: string;
+    expiresAt: Date;
+    attempts: number;
+}
 
-// Generate a random confirmation code
+const pendingSelfDestructs = new Map<string, PendingSelfDestruct>();
+
 const generateConfirmationCode = (): string => {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
 };
 
-// Initialize self-destruct sequence
+const cleanupExpiredSequences = (): void => {
+    const now = new Date();
+    for (const [id, sequence] of pendingSelfDestructs.entries()) {
+        if (sequence.expiresAt <= now) {
+            pendingSelfDestructs.delete(id);
+        }
+    }
+};
+
+setInterval(cleanupExpiredSequences, 60 * 1000);
+
 export const initiateSelfDestruct = async (
-  req: Request<{ id: string }>,
-  res: Response
+    req: Request<{ id: string }>,
+    res: Response
 ): Promise<void> => {
-  try {
-      const { id } = req.params;
-      const gadget = await gadgetRepository.findOneBy({ id });
+    try {
+        const { id } = req.params;
 
-      if (!gadget) {
-          res.status(404).json({ message: "Gadget not found" });
-          return;
-      }
+        if (!id || typeof id !== 'string') {
+            res.status(400).json({ message: "Invalid gadget ID" });
+            return;
+        }
 
-      if (gadget.status === 'Decommissioned') {
-          res.status(400).json({ message: "Cannot self-destruct a decommissioned gadget" });
-          return;
-      }
+        const gadget = await gadgetRepository.findOneBy({ id });
 
-      // Generate new confirmation code
-      const confirmationCode = generateConfirmationCode();
-      
-      // Store code with 5-minute expiration
-      pendingSelfDestructs.set(id, {
-          code: confirmationCode,
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
-          attempts: 0
-      });
+        if (!gadget) {
+            res.status(404).json({ message: "Gadget not found" });
+            return;
+        }
 
-      res.json({
-          message: "Self-destruct sequence initiated",
-          confirmationCode,
-          expiresIn: "5 minutes"
-      });
+        if (gadget.status === 'Decommissioned' || gadget.status === 'Destroyed') {
+            res.status(400).json({ 
+                message: `Cannot self-destruct a gadget in ${gadget.status} status` 
+            });
+            return;
+        }
 
-  } catch (error) {
-      res.status(500).json({ message: "Failed to initiate self-destruct sequence" });
-  }
+        const existingSequence = pendingSelfDestructs.get(id);
+        if (existingSequence && existingSequence.expiresAt > new Date()) {
+            res.status(409).json({ 
+                message: "Self-destruct sequence already in progress",
+                expiresAt: existingSequence.expiresAt,
+                remainingAttempts: 3 - existingSequence.attempts
+            });
+            return;
+        }
+
+        const confirmationCode = generateConfirmationCode();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        pendingSelfDestructs.set(id, {
+            code: confirmationCode,
+            expiresAt,
+            attempts: 0
+        });
+
+        res.json({
+            message: "Self-destruct sequence initiated",
+            confirmationCode,
+            expiresAt: expiresAt.toISOString()
+        });
+
+    } catch (error:any) {
+        console.error('Self-destruct initiation error:', error);
+        res.status(500).json({ 
+            message: "Failed to initiate self-destruct sequence",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
 };
 
-// Confirm self-destruct sequence
 export const confirmSelfDestruct = async (
-  req: Request<{ id: string }, {}, SelfDestructRequestBody>,
-  res: Response
+    req: Request<{ id: string }, {}, SelfDestructRequestBody>,
+    res: Response
 ): Promise<void> => {
-  try {
-      const { id } = req.params;
-      const { confirmationCode } = req.body;
+    try {
+        const { id } = req.params;
+        const { confirmationCode } = req.body;
 
-      const pendingDestruct = pendingSelfDestructs.get(id);
-      const gadget = await gadgetRepository.findOneBy({ id });
+        if (!confirmationCode || typeof confirmationCode !== 'string') {
+            res.status(400).json({ message: "Invalid confirmation code format" });
+            return;
+        }
 
-      if (!gadget) {
-          res.status(404).json({ message: "Gadget not found" });
-          return;
-      }
+        const pendingDestruct = pendingSelfDestructs.get(id);
+        const gadget = await gadgetRepository.findOneBy({ id });
 
-      if (!pendingDestruct) {
-          res.status(400).json({ message: "No pending self-destruct sequence found" });
-          return;
-      }
+        if (!gadget) {
+            res.status(404).json({ message: "Gadget not found" });
+            return;
+        }
 
-      // Check if code has expired
-      if (new Date() > pendingDestruct.expiresAt) {
-          pendingSelfDestructs.delete(id);
-          res.status(400).json({ message: "Confirmation code has expired" });
-          return;
-      }
+        if (!pendingDestruct) {
+            res.status(400).json({ message: "No pending self-destruct sequence found" });
+            return;
+        }
 
-      // Increment attempts
-      pendingDestruct.attempts += 1;
+        if (new Date() > pendingDestruct.expiresAt) {
+            pendingSelfDestructs.delete(id);
+            res.status(400).json({ message: "Confirmation code has expired" });
+            return;
+        }
 
-      // Check if too many attempts (max 3)
-      if (pendingDestruct.attempts >= 3) {
-          pendingSelfDestructs.delete(id);
-          res.status(400).json({ message: "Too many failed attempts. Self-destruct sequence aborted" });
-          return;
-      }
+        const isCodeValid = crypto.timingSafeEqual(
+            Buffer.from(confirmationCode.toUpperCase()),
+            Buffer.from(pendingDestruct.code)
+        );
 
-      // Verify confirmation code
-      if (confirmationCode !== pendingDestruct.code) {
-          res.status(400).json({ 
-              message: "Invalid confirmation code",
-              remainingAttempts: 3 - pendingDestruct.attempts
-          });
-          return;
-      }
+        pendingDestruct.attempts += 1;
 
-      // Execute self-destruct
-      gadget.status = 'Destroyed';
-      gadget.decommissionedAt = new Date();
-      await gadgetRepository.save(gadget);
+        if (pendingDestruct.attempts >= 3) {
+            pendingSelfDestructs.delete(id);
+            res.status(400).json({ message: "Too many failed attempts. Self-destruct sequence aborted" });
+            return;
+        }
 
-      // Clean up pending self-destruct
-      pendingSelfDestructs.delete(id);
+        if (!isCodeValid) {
+            res.status(400).json({ 
+                message: "Invalid confirmation code",
+                remainingAttempts: 3 - pendingDestruct.attempts
+            });
+            return;
+        }
 
-      res.json({
-          message: "Self-destruct sequence completed successfully",
-          gadget
-      });
+        await gadgetRepository.update(id, {
+            status: 'Destroyed',
+            decommissionedAt: new Date()
+        });
 
-  } catch (error) {
-      res.status(500).json({ message: "Failed to complete self-destruct sequence" });
-  }
+        pendingSelfDestructs.delete(id);
+
+        res.json({
+            message: "Self-destruct sequence completed successfully",
+            gadget: await gadgetRepository.findOneBy({ id }) 
+        });
+
+    } catch (error:any) {
+        console.error('Self-destruct confirmation error:', error);
+        res.status(500).json({ 
+            message: "Failed to complete self-destruct sequence",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
 };

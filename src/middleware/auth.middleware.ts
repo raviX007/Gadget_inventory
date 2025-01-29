@@ -1,5 +1,3 @@
-// src/middleware/auth.middleware.ts
-
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { JwtPayload } from '../types/auth.types';
@@ -31,7 +29,11 @@ export const authenticateToken = async (
         const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         req.user = decoded;
         next();
-    } catch (error) {
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+            res.status(403).json({ message: error.message });
+            return;
+        }
         res.status(403).json({ message: 'Invalid or expired token' });
         return;
     }

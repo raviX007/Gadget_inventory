@@ -1,4 +1,3 @@
-// src/config/database.ts
 import 'dotenv/config';
 import { DataSource } from "typeorm";
 import { Gadget } from "../models/Gadget";
@@ -15,6 +14,6 @@ export const AppDataSource = new DataSource({
     synchronize: true,
     logging: true,
     ssl: {
-        rejectUnauthorized: false // Use true in production with proper certificates
+        rejectUnauthorized: false 
     }
 });

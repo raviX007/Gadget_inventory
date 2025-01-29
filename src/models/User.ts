@@ -1,4 +1,3 @@
-// src/models/User.ts
 
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import bcrypt from 'bcrypt';
