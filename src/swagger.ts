@@ -228,9 +228,9 @@ const swaggerOptions = {
                 required: false,
                 schema: {
                     type: 'string',
-                    enum: ['Active', 'Decommissioned', 'Destroyed']
+                    enum: ['All', 'Active', 'Decommissioned', 'Destroyed']
                 },
-                description: 'Filter gadgets by status'
+                description: 'Filter gadgets by status. Use "All" to get gadgets in all statuses.'
             }
         ],
         responses: {
@@ -239,13 +239,25 @@ const swaggerOptions = {
                 content: {
                     'application/json': {
                         schema: {
-                            type: 'array',
-                            items: {
-                                $ref: '#/components/schemas/Gadget'
+                            type: 'object',
+                            properties: {
+                                data: {
+                                    type: 'array',
+                                    items: {
+                                        $ref: '#/components/schemas/Gadget'
+                                    }
+                                },
+                                total: {
+                                    type: 'number',
+                                    description: 'Total number of gadgets returned'
+                                }
                             }
                         }
                     }
                 }
+            },
+            '400': {
+                description: 'Invalid status parameter'
             },
             '500': {
                 description: 'Server error'

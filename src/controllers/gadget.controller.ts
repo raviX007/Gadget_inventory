@@ -12,27 +12,34 @@ const gadgetRepository = AppDataSource.getRepository(Gadget);
 export const getGadgets = async (req: Request, res: Response): Promise<void> => {
   try {
       const { status } = req.query;
-
-     
       const queryBuilder = gadgetRepository.createQueryBuilder('gadget');
 
       if (status) {
-          const validStatuses = ['Active', 'Decommissioned', 'Destroyed'];
+          const validStatuses = ['All', 'Active', 'Decommissioned', 'Destroyed'];
           if (!validStatuses.includes(status as string)) {
               res.status(400).json({ 
-                  message: 'Invalid status. Must be one of: Active, Decommissioned, Destroyed' 
+                  message: 'Invalid status. Must be one of: All, Active, Decommissioned, Destroyed' 
               });
               return;
           }
 
-          queryBuilder.where('gadget.status = :status', { status });
+          // Apply status filter only if it's not 'All'
+          if (status !== 'All') {
+              queryBuilder.where('gadget.status = :status', { status });
+          }
+      } else {
+          // Default behavior: exclude decommissioned gadgets
+          queryBuilder.where('gadget.status != :status', { status: 'Decommissioned' });
       }
 
       queryBuilder.orderBy('gadget.createdAt', 'DESC');
-
       const gadgets = await queryBuilder.getMany();
 
-      res.json(gadgets);
+      res.json({
+          data: gadgets,
+          total: gadgets.length
+      });
+
   } catch (error) {
       console.error('Error fetching gadgets:', error);
       res.status(500).json({ message: 'Failed to fetch gadgets' });
