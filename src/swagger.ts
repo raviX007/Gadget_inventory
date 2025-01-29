@@ -12,8 +12,12 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'https://gadget-inventory-4qyd.onrender.com',
+                url: process.env.BASE_URL || 'http://localhost:3000',
                 description: 'Development server',
+            },
+            {
+                url: 'https://gadget-inventory-4qyd.onrender.com',
+                description: 'Production server',
             },
         ],
         components: {
@@ -473,13 +477,28 @@ const swaggerOptions = {
         
     },
      
-    apis: ['./src/controllers/*.ts']
+    apis: [
+        './dist/controllers/*.js',  // For compiled JavaScript files
+        './src/controllers/*.ts',   // For TypeScript source files
+        './src/routes/*.ts',        // Include route files if you have separate route definitions
+    ]
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 
 const setupSwagger = (app: Application): void => {
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+    // Add basic security headers
+    app.use('/api-docs', (req, res, next) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+    });
+    
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
+        explorer: true,
+        customCss: '.swagger-ui .topbar { display: none }',
+        customSiteTitle: "IMF Gadgets API Documentation"
+    }));
 };
 
 export default setupSwagger;
