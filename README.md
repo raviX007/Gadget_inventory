@@ -49,7 +49,8 @@ DB_DATABASE=imf_gadgets
 4. Start the development server:
 
 ```bash
-npm start
+npx tsc
+node dist/server.js
 ```
 
 ## API Documentation
@@ -59,6 +60,8 @@ The API documentation is available at `/api-docs` when the server is running. Yo
 ### Main Endpoints
 
 #### Authentication
+
+##### Note: You need to login in order to get token and add that token in swagger ui to perform operations on Gadgets
 
 - `POST /api/auth/register` - Register a new user
 - `POST /api/auth/login` - Login and receive JWT token
@@ -71,14 +74,6 @@ The API documentation is available at `/api-docs` when the server is running. Yo
 - `DELETE /api/gadgets/:id` - Decommission a gadget
 - `POST /api/gadgets/:id/self-destruct` - Initiate self-destruct sequence
 - `POST /api/gadgets/:id/self-destruct/confirm` - Confirm self-destruct
-
-## Authentication
-
-The API uses JWT tokens for authentication. Include the token in the Authorization header:
-
-```bash
-Authorization: Bearer <your_jwt_token>
-```
 
 ## Database Schema
 
