@@ -478,27 +478,38 @@ const swaggerOptions = {
     },
      
     apis: [
-        './dist/controllers/*.js',  // For compiled JavaScript files
-        './src/controllers/*.ts',   // For TypeScript source files
-        './src/routes/*.ts',        // Include route files if you have separate route definitions
+        './dist/controllers/*.js',  
+        './src/controllers/*.ts',   
+        './src/routes/*.ts',        
     ]
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 
 const setupSwagger = (app: Application): void => {
-    // Add basic security headers
+    
     app.use('/api-docs', (req, res, next) => {
-        res.header('Access-Control-Allow-Origin', '*');
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+        res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,authorization');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
         next();
     });
-    
+
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
         explorer: true,
-        customCss: '.swagger-ui .topbar { display: none }',
-        customSiteTitle: "IMF Gadgets API Documentation"
+        customSiteTitle: "IMF Gadgets API Documentation",
+        swaggerOptions: {
+            url: '/api-docs.json', 
+            displayRequestDuration: true,
+            persistAuthorization: true,
+        }
     }));
+
+    
+    app.get('/api-docs.json', (req, res) => {
+        res.json(swaggerDocs);
+    });
 };
 
 export default setupSwagger;
