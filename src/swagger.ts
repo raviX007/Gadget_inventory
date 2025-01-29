@@ -12,10 +12,6 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: process.env.BASE_URL || 'http://localhost:3000',
-                description: 'Development server',
-            },
-            {
                 url: 'https://gadget-inventory-0nvc.onrender.com',
                 description: 'Production server',
             },
