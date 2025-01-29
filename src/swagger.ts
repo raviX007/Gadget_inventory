@@ -16,7 +16,7 @@ const swaggerOptions = {
                 description: 'Development server',
             },
             {
-                url: 'https://gadget-inventory-0nvc.onrender.com/',
+                url: 'https://gadget-inventory-0nvc.onrender.com',
                 description: 'Production server',
             },
         ],
