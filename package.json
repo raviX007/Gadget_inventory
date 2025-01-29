@@ -23,5 +23,11 @@
     "@types/swagger-ui-express": "^4.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "yarn clean && yarn tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
   }
 }
